@@ -1,40 +1,46 @@
 import asyncio
-import schedule
+import argparse
 from fastapi import FastAPI
 from app.api.router import router
-from app.validator.proxy_validator import ProxyValidator
-from app.crawlers.base_crawler import BaseCrawler
-from app.storage.redis_client import redis_conn
-import uvicorn
-from app.core.config import settings
+from app.crawlers import discover_crawlers
+import logging
+from app.log_config import setup_logging
+
+# 设置日志
+setup_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
-app.include_router(router, prefix="/api")
-validator = ProxyValidator()
+app.include_router(router)
 
-async def validate_job():
-    proxies = await redis_conn.zrange(settings.PROXY_KEY, 0, -1)
-    await validator.validate_proxies(proxies)
-
-async def crawl_job():
-    crawlers = BaseCrawler.__subclasses__()
-    for crawler_cls in crawlers:
-        crawler = crawler_cls()
-        await crawler.crawl()
-
-async def scheduler():
-    schedule.every(settings.CHECK_INTERVAL).seconds.do(
-        lambda: asyncio.create_task(validate_job())
-    )
-    schedule.every().hour.do(
-        lambda: asyncio.create_task(crawl_job())
-    )
+async def run_crawlers():
+    """运行所有爬虫"""
+    crawler_classes = discover_crawlers()
+    tasks = []
     
-    while True:
-        schedule.run_pending()
-        await asyncio.sleep(1)
+    for crawler_cls in crawler_classes:
+        crawler = crawler_cls()
+        tasks.append(crawler.crawl())
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # 处理结果，记录错误
+    total_proxies = 0
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.error(f"爬虫 {crawler_classes[i].__name__} 执行出错: {str(result)}")
+        elif isinstance(result, int):
+            total_proxies += result
+    
+    logger.info(f"爬虫任务完成，共获取 {total_proxies} 个代理")
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    loop.create_task(scheduler())
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    parser = argparse.ArgumentParser(description="代理池管理系统")
+    parser.add_argument("--crawl", action="store_true", help="运行爬虫任务")
+    args = parser.parse_args()
+    
+    if args.crawl:
+        asyncio.run(run_crawlers())
+    else:
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
