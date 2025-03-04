@@ -61,7 +61,6 @@ async def validate_task():
     """定期验证代理的后台任务"""
     # 记录上次爬虫执行时间，避免频繁触发
     last_crawl_time = 0
-    min_crawl_interval = 300  # 最小爬虫触发间隔（秒）
     
     while running:
         try:
@@ -73,20 +72,25 @@ async def validate_task():
             
             # 如果代理池为空，直接触发爬虫任务
             if proxy_count == 0:
-                if current_time - last_crawl_time > min_crawl_interval:
+                if current_time - last_crawl_time > settings.CRAWL_MIN_INTERVAL:
                     logger.warning("代理池为空，立即触发爬虫任务")
                     await run_crawlers()
                     last_crawl_time = current_time
                 else:
-                    logger.info(f"代理池为空，但距离上次爬虫任务不足{min_crawl_interval}秒，跳过")
+                    logger.info(f"代理池为空，但距离上次爬虫任务不足{settings.CRAWL_MIN_INTERVAL}秒，跳过")
             else:
                 # 验证所有代理
                 valid_count = await validator.check_all_proxies()
                 logger.info(f"验证完成，有效代理数量: {valid_count}")
                 
                 # 如果代理数量低于阈值，触发爬虫任务
-                if valid_count < settings.MIN_PROXIES and current_time - last_crawl_time > min_crawl_interval:
+                if valid_count < settings.MIN_PROXIES and current_time - last_crawl_time > settings.CRAWL_MIN_INTERVAL:
                     logger.warning(f"代理数量 ({valid_count}) 低于最小阈值 ({settings.MIN_PROXIES})，触发爬虫任务")
+                    await run_crawlers()
+                    last_crawl_time = current_time
+                # 定期触发爬虫任务，即使代理数量足够，也要保持新鲜度
+                elif current_time - last_crawl_time > settings.CRAWL_INTERVAL:
+                    logger.info(f"距离上次爬虫任务已超过{settings.CRAWL_INTERVAL}秒，定期触发爬虫任务")
                     await run_crawlers()
                     last_crawl_time = current_time
             

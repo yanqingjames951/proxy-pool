@@ -14,12 +14,15 @@ class ZdayeCrawler(BaseCrawler):
     def __init__(self):
         super().__init__()
         self.site_name = "站大爷代理"
-        # 尝试使用API接口而不是HTML页面
+        # 更新URL列表，添加更多可能的URL和替代站点
         self.urls = [
             "https://www.zdaye.com/api/proxy/free/1",  # 尝试可能的API接口
             "https://www.zdaye.com/dayProxy/ip/1.html",  # 尝试其他可能的URL格式
             "https://www.zdaye.com/free/1",  # 尝试其他可能的URL格式
-            "https://www.zdaye.com/dayProxy/1.html"  # 原始URL
+            "https://www.zdaye.com/dayProxy/1.html",  # 原始URL
+            "https://proxy-list.org/english/index.php",  # 替代站点1
+            "https://www.proxy-list.download/HTTP",  # 替代站点2
+            "https://www.proxynova.com/proxy-server-list/"  # 替代站点3
         ]
         # 添加更多请求头
         self.headers = {
@@ -115,6 +118,12 @@ class ZdayeCrawler(BaseCrawler):
                         proxy = f"{protocol}://{ip}:{port}"
                         proxies.append(proxy)
                         logger.debug(f"从JSON中发现代理: {proxy}")
+                        
+                        # 如果是HTTP代理，也添加HTTPS版本
+                        if protocol == "http":
+                            https_proxy = f"https://{ip}:{port}"
+                            proxies.append(https_proxy)
+                            logger.debug(f"从JSON中发现代理(HTTPS): {https_proxy}")
                 
                 return proxies
         except json.JSONDecodeError:
@@ -123,6 +132,29 @@ class ZdayeCrawler(BaseCrawler):
         
         # 尝试解析HTML
         soup = BeautifulSoup(html, 'html.parser')
+        
+        # 处理proxy-list.org特殊格式
+        if "proxy-list.org" in html:
+            script_tags = soup.find_all("script")
+            for script in script_tags:
+                script_text = script.string
+                if script_text and "Proxy(" in script_text:
+                    # 提取Base64编码的代理信息
+                    import base64
+                    matches = re.findall(r"Proxy\('([^']+)'\)", script_text)
+                    for match in matches:
+                        try:
+                            decoded = base64.b64decode(match).decode('utf-8')
+                            if ":" in decoded:
+                                ip, port = decoded.split(":")
+                                if ip and port:
+                                    http_proxy = f"http://{ip}:{port}"
+                                    https_proxy = f"https://{ip}:{port}"
+                                    proxies.append(http_proxy)
+                                    proxies.append(https_proxy)
+                                    logger.debug(f"从Base64中发现代理: {http_proxy}")
+                        except Exception as e:
+                            logger.debug(f"Base64解码失败: {str(e)}")
         
         # 尝试查找表格
         tables = soup.find_all('table')
@@ -158,6 +190,12 @@ class ZdayeCrawler(BaseCrawler):
                     proxy = f"{protocol}://{ip}:{port}"
                     proxies.append(proxy)
                     logger.debug(f"从HTML中发现代理: {proxy}")
+                    
+                    # 如果是HTTP代理，也添加HTTPS版本
+                    if protocol == "http":
+                        https_proxy = f"https://{ip}:{port}"
+                        proxies.append(https_proxy)
+                        logger.debug(f"从HTML中发现代理(HTTPS): {https_proxy}")
         
         # 如果表格解析失败，尝试使用正则表达式直接从HTML中提取IP和端口
         if not proxies:
@@ -167,8 +205,14 @@ class ZdayeCrawler(BaseCrawler):
             for ip, port in matches:
                 # 验证IP和端口的有效性
                 if all(0 <= int(part) <= 255 for part in ip.split('.')) and 1 <= int(port) <= 65535:
-                    proxy = f"http://{ip}:{port}"
-                    proxies.append(proxy)
-                    logger.debug(f"使用正则表达式发现代理: {proxy}")
+                    # 添加HTTP代理
+                    http_proxy = f"http://{ip}:{port}"
+                    proxies.append(http_proxy)
+                    logger.debug(f"使用正则表达式发现代理(HTTP): {http_proxy}")
+                    
+                    # 添加HTTPS代理
+                    https_proxy = f"https://{ip}:{port}"
+                    proxies.append(https_proxy)
+                    logger.debug(f"使用正则表达式发现代理(HTTPS): {https_proxy}")
         
         return proxies

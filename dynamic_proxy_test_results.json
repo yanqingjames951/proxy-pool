@@ -1,0 +1,103 @@
+{
+  "total_tested": 10,
+  "successful_requests": 0,
+  "failed_requests": 10,
+  "unique_ips": [],
+  "response_times": [],
+  "details": [
+    {
+      "proxy": "socks5://165.22.209.96:25150",
+      "protocol": "socks5",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks5://47.243.207.3:33967",
+      "protocol": "socks5",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://117.24.80.210:3829",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://103.59.203.249:4145",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://118.179.87.170:5678",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks5://89.19.177.197:1080",
+      "protocol": "socks5",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://104.20.225.218:80",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "400, message='Bad Request', url='socks4://104.20.225.218:80'",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://103.59.203.249:4145",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://119.40.87.97:5678",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    },
+    {
+      "proxy": "socks4://118.179.87.170:5678",
+      "protocol": "socks4",
+      "success": false,
+      "ip": null,
+      "response_time": null,
+      "error": "Server disconnected",
+      "anonymous": false
+    }
+  ],
+  "success_rate": 0.0,
+  "ip_change_rate": 0,
+  "avg_response_time": 0,
+  "anonymous_rate": 0
+}

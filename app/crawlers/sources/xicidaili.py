@@ -12,10 +12,13 @@ class XicidailiCrawler(BaseCrawler):
     def __init__(self):
         super().__init__()
         self.site_name = "西刺代理"
-        # 更新为新的URL（如果有）
+        # 更新为新的URL
         self.urls = [
             "https://www.xicidaili.com/nn/",
-            "http://ww1.xicidaili.com/"  # 尝试备用域名
+            "http://www.xicidaili.com/",
+            "https://www.xicidaili.com/",
+            "http://xicidaili.com/",
+            "https://free-proxy-list.com/"  # 替代网站，类似西刺
         ]
         # 添加更多请求头
         self.headers = {
@@ -115,5 +118,25 @@ class XicidailiCrawler(BaseCrawler):
                     proxy = f"{protocol}://{ip}:{port}"
                     proxies.append(proxy)
                     logger.debug(f"发现代理: {proxy}")
+        
+        # 如果表格解析失败，尝试使用正则表达式直接从HTML中提取IP和端口
+        if not proxies:
+            import re
+            # 匹配IP:端口格式
+            ip_port_pattern = r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[^\d]*?(\d{1,5})'
+            matches = re.findall(ip_port_pattern, html)
+            
+            for ip, port in matches:
+                # 验证IP和端口的有效性
+                if all(0 <= int(part) <= 255 for part in ip.split('.')) and 1 <= int(port) <= 65535:
+                    # 默认使用HTTP协议，也可以添加HTTPS
+                    proxy = f"http://{ip}:{port}"
+                    proxies.append(proxy)
+                    logger.debug(f"使用正则表达式发现代理: {proxy}")
+                    
+                    # 同时添加HTTPS版本，增加代理多样性
+                    https_proxy = f"https://{ip}:{port}"
+                    proxies.append(https_proxy)
+                    logger.debug(f"使用正则表达式发现代理(HTTPS): {https_proxy}")
         
         return proxies

@@ -9,15 +9,35 @@ logger = logging.getLogger(__name__)
 
 class ProxyValidator:
     def __init__(self):
-        self.http_test_url = "http://httpbin.org/ip"
-        self.https_test_url = "https://httpbin.org/ip"
+        # 使用多个测试URL，增加验证的可靠性
+        self.test_urls = {
+            "http": [
+                "http://httpbin.org/ip",
+                "http://ip.42.pl/raw",
+                "http://ip-api.com/json/"
+            ],
+            "https": [
+                "https://httpbin.org/ip",
+                "https://api.ipify.org/",
+                "https://ip.seeip.org/jsonip"
+            ],
+            "socks4": [
+                "http://httpbin.org/ip"
+            ],
+            "socks5": [
+                "http://httpbin.org/ip"
+            ]
+        }
         self.timeout = aiohttp.ClientTimeout(total=settings.PROXY_TIMEOUT)
         self.semaphore = asyncio.Semaphore(50)  # 并发控制
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "application/json",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
             "Connection": "close"  # 避免保持连接
         }
+        # 优先验证的协议顺序
+        self.protocol_priority = ["http", "https", "socks5", "socks4"]
 
     async def _verify_proxy(self, proxy_url):
         """验证代理有效性"""
@@ -30,45 +50,66 @@ class ProxyValidator:
                 logger.warning(f"代理格式错误: {proxy_url}")
                 return proxy_url, False, 0
             
-            # 选择测试URL
-            test_url = self.https_test_url if protocol == "https" else self.http_test_url
+            # 如果协议不在支持的列表中，尝试使用http协议
+            if protocol not in self.protocol_priority:
+                logger.warning(f"不支持的代理协议: {protocol}，尝试使用http协议")
+                protocol = "http"
+                proxy_url = f"http://{address}"
+            
+            # 获取该协议的测试URL列表
+            test_urls = self.test_urls.get(protocol, self.test_urls["http"])
             
             # 测试响应时间和有效性
-            start_time = datetime.now()
-            try:
-                # 根据协议类型设置代理
-                if protocol in ["http", "https"]:
-                    proxy = f"{protocol}://{address}"
-                elif protocol in ["socks4", "socks5"]:
-                    proxy = f"{protocol}://{address}"
-                else:
-                    logger.warning(f"不支持的代理协议: {protocol}")
-                    return proxy_url, False, 0
+            best_response_time = float('inf')
+            success = False
+            
+            # 根据协议类型设置代理
+            proxy = f"{protocol}://{address}"
+            
+            # 尝试多个测试URL
+            for test_url in test_urls:
+                start_time = datetime.now()
+                try:
+                    async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                        async with session.get(
+                            test_url,
+                            proxy=proxy,
+                            headers=self.headers,
+                            ssl=False  # 禁用SSL验证以支持自签名证书
+                        ) as resp:
+                            if resp.status == 200:
+                                # 计算响应时间（毫秒）
+                                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                                logger.debug(f"代理有效: {proxy_url}, URL: {test_url}, 响应时间: {response_time:.2f}ms")
+                                
+                                # 更新最佳响应时间
+                                if response_time < best_response_time:
+                                    best_response_time = response_time
+                                
+                                success = True
+                                # 一旦成功，不需要测试其他URL
+                                break
+                            else:
+                                logger.debug(f"代理无效: {proxy_url}, URL: {test_url}, 状态码: {resp.status}")
+                except asyncio.TimeoutError:
+                    logger.debug(f"代理超时: {proxy_url}, URL: {test_url}")
+                except aiohttp.ClientProxyConnectionError:
+                    logger.debug(f"代理连接错误: {proxy_url}, URL: {test_url}")
+                except aiohttp.ClientConnectorError:
+                    logger.debug(f"代理连接器错误: {proxy_url}, URL: {test_url}")
+                except Exception as e:
+                    logger.debug(f"代理验证异常: {proxy_url}, URL: {test_url}, {str(e)}")
+            
+            if success:
+                return proxy_url, True, best_response_time
+            else:
+                # 如果是HTTP代理，尝试作为HTTPS代理使用
+                if protocol == "http":
+                    https_proxy_url = f"https://{address}"
+                    logger.debug(f"HTTP代理验证失败，尝试作为HTTPS代理: {https_proxy_url}")
+                    return await self._verify_proxy(https_proxy_url)
                 
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    async with session.get(
-                        test_url,
-                        proxy=proxy,
-                        headers=self.headers,
-                        ssl=False  # 禁用SSL验证以支持自签名证书
-                    ) as resp:
-                        if resp.status == 200:
-                            # 计算响应时间（毫秒）
-                            response_time = (datetime.now() - start_time).total_seconds() * 1000
-                            logger.debug(f"代理有效: {proxy_url}, 响应时间: {response_time:.2f}ms")
-                            return proxy_url, True, response_time
-                        else:
-                            logger.debug(f"代理无效: {proxy_url}, 状态码: {resp.status}")
-            except asyncio.TimeoutError:
-                logger.debug(f"代理超时: {proxy_url}")
-            except aiohttp.ClientProxyConnectionError:
-                logger.debug(f"代理连接错误: {proxy_url}")
-            except aiohttp.ClientConnectorError:
-                logger.debug(f"代理连接器错误: {proxy_url}")
-            except Exception as e:
-                logger.debug(f"代理验证异常: {proxy_url}, {str(e)}")
-                
-            return proxy_url, False, 0
+                return proxy_url, False, 0
 
     async def validate_proxies(self, proxies):
         """验证多个代理并更新到Redis"""
