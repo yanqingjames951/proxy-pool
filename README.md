@@ -61,7 +61,29 @@ python run.py --crawl
 
 # 启动API服务
 python run.py
+
+# 验证所有代理
+python run.py --validate
 ```
+
+## 测试
+
+项目提供了测试脚本，用于验证代理池是否符合动态代理的要求：
+
+```bash
+# 运行动态代理测试
+python tests/run_tests.py --dynamic
+
+# 运行所有测试
+python tests/run_tests.py --all
+```
+
+动态代理测试会检查以下指标：
+- 代理可用性（成功率）
+- IP动态变化率
+- 响应时间
+- 匿名性
+- 代理轮换功能
 
 ## 项目结构
 ```
@@ -72,6 +94,9 @@ python run.py
 │   ├── storage         # 存储模块
 │   ├── validator       # 代理验证
 │   └── core            # 核心配置
+├── tests               # 测试脚本
+│   ├── test_dynamic_proxy.py  # 动态代理测试
+│   └── run_tests.py    # 测试运行器
 ├── docker-compose.yml
 ├── requirements.txt
 └── run.py             # 主入口
@@ -139,4 +164,5 @@ python run.py
 - 改进了主程序，添加了定期验证和自动触发爬虫的功能
 - 扩展了API接口，添加了更多端点和功能
 - 增强了系统的健壮性和错误处理
+- 添加了动态代理测试脚本，用于验证代理池的质量和性能
 - 更新README文档，反映当前项目状态
